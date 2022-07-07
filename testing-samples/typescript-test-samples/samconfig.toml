@@ -1,0 +1,11 @@
+version = 0.1
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "sam-test"
+s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-1wj0p4ptxyna8"
+s3_prefix = "sam-test"
+region = "eu-central-1"
+profile = "dev"
+capabilities = "CAPABILITY_IAM"
+image_repositories = []
