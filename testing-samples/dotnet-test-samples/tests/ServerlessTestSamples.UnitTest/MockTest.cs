@@ -4,6 +4,7 @@ using Amazon.Lambda;
 using Amazon.Lambda.APIGatewayEvents;
 using Amazon.Lambda.Core;
 using Amazon.Lambda.Model;
+using Amazon.Lambda.TestUtilities;
 using Amazon.S3;
 using Amazon.S3.Model;
 using FluentAssertions;
@@ -29,13 +30,12 @@ public class MockTest
             },
             HttpStatusCode = HttpStatusCode.OK
         });
-
-        var mockContext = new Mock<ILambdaContext>();
+        
         var mockRequest = new Mock<APIGatewayProxyRequest>();
 
         var function = new Function(mockedS3Client.Object);
 
-        var result = await function.Handler(mockRequest.Object, mockContext.Object);
+        var result = await function.Handler(mockRequest.Object, new TestLambdaContext());
 
         result.StatusCode.Should().Be(200);
         result.Body.Should().Be("[\"bucket1\",\"bucket2\",\"bucket3\"]");
@@ -52,20 +52,19 @@ public class MockTest
             },
             HttpStatusCode = HttpStatusCode.OK
         });
-
-        var mockContext = new Mock<ILambdaContext>();
+        
         var mockRequest = new Mock<APIGatewayProxyRequest>();
 
         var function = new Function(mockedS3Client.Object);
 
-        var result = await function.Handler(mockRequest.Object, mockContext.Object);
+        var result = await function.Handler(mockRequest.Object, new TestLambdaContext());
 
         result.StatusCode.Should().Be(200);
         result.Body.Should().Be("[]");
     }
 
     [Fact]
-    public async Task TestLambdaHandlerWithS3Error_ShouldReturnEmpty()
+    public async Task TestLambdaHandlerWithS3NullResponse_ShouldReturnEmpty()
     {
         var mockedS3Client = new Mock<AmazonS3Client>();
         mockedS3Client.Setup(p => p.ListBucketsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new ListBucketsResponse()
@@ -73,13 +72,29 @@ public class MockTest
             Buckets = null,
             HttpStatusCode = HttpStatusCode.BadRequest
         });
-
-        var mockContext = new Mock<ILambdaContext>();
+        
         var mockRequest = new Mock<APIGatewayProxyRequest>();
 
         var function = new Function(mockedS3Client.Object);
 
-        var result = await function.Handler(mockRequest.Object, mockContext.Object);
+        var result = await function.Handler(mockRequest.Object, new TestLambdaContext());
+
+        result.StatusCode.Should().Be(500);
+        result.Body.Should().Be("[]");
+    }
+
+    [Fact]
+    public async Task TestLambdaHandlerWithS3Exception_ShouldReturnEmpty()
+    {
+        var mockedS3Client = new Mock<AmazonS3Client>();
+        mockedS3Client.Setup(p => p.ListBucketsAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new AmazonS3Exception("Mock S3 failure"));
+        
+        var mockRequest = new Mock<APIGatewayProxyRequest>();
+
+        var function = new Function(mockedS3Client.Object);
+
+        var result = await function.Handler(mockRequest.Object, new TestLambdaContext());
 
         result.StatusCode.Should().Be(500);
         result.Body.Should().Be("[]");

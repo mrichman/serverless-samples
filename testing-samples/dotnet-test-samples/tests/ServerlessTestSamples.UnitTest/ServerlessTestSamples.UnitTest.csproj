@@ -9,6 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Amazon.Lambda.TestUtilities" Version="2.0.0" />
     <PackageReference Include="AWSSDK.Lambda" Version="3.7.13.16" />
     <PackageReference Include="Amazon.Lambda.APIGatewayEvents" Version="2.4.0" />
     <PackageReference Include="FluentAssertions" Version="6.7.0" />

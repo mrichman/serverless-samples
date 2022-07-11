@@ -126,6 +126,15 @@ The project uses the [Moq](https://github.com/moq/moq4) library to provide a moc
 # run unit tests with mocks
 dotnet-test-samples$ dotnet test .\tests\ServerlessTestSamples.UnitTest\
 ```
+
+The constructor of the Lambda function class contains one public, functionless constructor and one internal constructor. The Lambda service requires a parameterless constructor. The internal constructor is included to allow mock implementations of services to be passed in at initialization. The internal constructor is made available to the ServerlessTestSamples.UnitTest project through the AssemblyInfo.cs file.
+
+```c#
+using System.Runtime.CompilerServices;
+
+[assembly:InternalsVisibleTo("ServerlessTestSamples.UnitTest")]
+```
+
 [[top]](#dotnet-test-samples)
 
 ## Run integration tests against cloud resources
