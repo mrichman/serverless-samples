@@ -6,6 +6,7 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{B0C6CE17-E43C-43FD-8151-2624B53C9519}"
 	ProjectSection(SolutionItems) = preProject
 		README.md = README.md
+		template.yaml = template.yaml
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ServerlessTestSamples", "src\ServerlessTestSamples\ServerlessTestSamples.csproj", "{DFDBFE72-53E5-447A-8CE8-A99A4C6405FF}"

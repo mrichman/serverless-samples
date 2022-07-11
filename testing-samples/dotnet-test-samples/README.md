@@ -210,16 +210,54 @@ cd loadtest
 ## Implement application tracing
 You can use AWS X-Ray to track user requests as they travel through your entire application. With X-Ray, you can understand how your application and its underlying services are performing to identify and troubleshoot the root cause of performance issues and errors.
 
-TODO
+X-Ray tracing is configured in .NET using the AWSXRayRecorder libraries. Automatic instruementation can be added for:
+
+- AWSSDK calls
+- External HTTP requests
+- SQL queries
+
+To enable this for AWS Lambda the SAM template and function code both need to be updated.
+
+### SAM Template
+
+Tracing needs to be enabled in the SAM template for both the API and Lambda function. Enable this with two additional properties in the Globals section of the SAM template.
+
+``` yaml
+Globals:
+  Function:
+    Tracing: PassThrough
+    Timeout: 10
+    Runtime: dotnet6
+    Architectures:
+      - arm64
+  Api:
+    TracingEnabled: True
+```
+
+### Function Code
+
+Code is instrumented in the function code. For auto-instrumentation of the AWSSDK the AWSSDK handler needs to be registered before the SDK clients are initialised.
+
+```c#
+internal Function(AmazonS3Client client, HttpClient httpClient)
+{
+    AWSSDKHandler.RegisterXRayForAllServices();
+
+    this._s3Client = client ?? new AmazonS3Client();
+    this._httpClient = httpClient ?? new HttpClient(new HttpClientXRayTracingHandler(new HttpClientHandler()));
+}
+```
+
+Further details on instrumenting with the [AWS XRay Recorder library are found in the AWS Docs.](https://docs.aws.amazon.com/xray/latest/devguide/xray-sdk-dotnet-segment.html) 
 
 [[top]](#python-test-samples)
 
 ## Cleanup
 
-To delete the sample application that you created, use the AWS CLI. Assuming you used your project name for the stack name, you can run the following:
+To delete the sample application that you created, use the SAM CLI.
 
 ```bash
-aws cloudformation delete-stack --stack-name python-test-samples
+sam delete
 ```
 
 ## Additional Resources

@@ -9,6 +9,9 @@ using Amazon.Lambda.APIGatewayEvents;
 using Amazon.S3;
 using System;
 using System.Net;
+using Amazon.XRay.Recorder.Core;
+using Amazon.XRay.Recorder.Handlers.AwsSdk;
+using Amazon.XRay.Recorder.Handlers.System.Net;
 
 // Assembly attribute to enable the Lambda function's JSON input to be converted into a .NET class.
 [assembly: LambdaSerializer(typeof(Amazon.Lambda.Serialization.SystemTextJson.DefaultLambdaJsonSerializer))]
@@ -18,14 +21,18 @@ namespace ServerlessTestSamples
     public class Function
     {
         private readonly AmazonS3Client _s3Client;
+        private readonly HttpClient _httpClient;
 
-        public Function() : this(new AmazonS3Client())
+        public Function() : this(null, null)
         {
         }
 
-        internal Function(AmazonS3Client client)
+        internal Function(AmazonS3Client client, HttpClient httpClient)
         {
-            this._s3Client = client;
+            AWSSDKHandler.RegisterXRayForAllServices();
+
+            this._s3Client = client ?? new AmazonS3Client();
+            this._httpClient = httpClient ?? new HttpClient(new HttpClientXRayTracingHandler(new HttpClientHandler()));
         }
 
         public async Task<APIGatewayProxyResponse> Handler(APIGatewayProxyRequest apigProxyEvent, ILambdaContext context)
@@ -43,8 +50,16 @@ namespace ServerlessTestSamples
                         Headers = new Dictionary<string, string> { { "Content-Type", "application/json" } }
                     };
                 }
+                
+                // Demonstrate tracing of an external HTTP request.
+                await this._httpClient.GetAsync("https://google.com");
+
+                // Add a custom sub-segment.
+                AWSXRayRecorder.Instance.BeginSubsegment("Bucket selection");
 
                 var bucketList = buckets.Buckets.Select(p => p.BucketName);
+                
+                AWSXRayRecorder.Instance.EndSubsegment();
 
                 Console.WriteLine("Write to logs");
 

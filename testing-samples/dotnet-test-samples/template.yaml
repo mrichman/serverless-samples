@@ -6,12 +6,20 @@ Description: >
 # More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
 Globals:
   Function:
+    Tracing: PassThrough
     Timeout: 10
+    Runtime: dotnet6
+    Architectures:
+      - arm64
+  Api:
+    TracingEnabled: True
 
 Resources:
   DotnetTestDemo:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
+      CodeUri: src/ServerlessTestSamples
+      Handler: ServerlessTestSamples::ServerlessTestSamples.Function::Handler
       Policies:
         - Version: '2012-10-17' # Policy Document
           Statement:
@@ -19,11 +27,6 @@ Resources:
               Action:
                 - s3:ListAllMyBuckets
               Resource: 'arn:aws:s3:::*'
-      CodeUri: src/ServerlessTestSamples
-      Handler: ServerlessTestSamples::ServerlessTestSamples.Function::Handler
-      Runtime: dotnet6
-      Architectures:
-        - arm64
       Events:
         HelloWorld:
           Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
