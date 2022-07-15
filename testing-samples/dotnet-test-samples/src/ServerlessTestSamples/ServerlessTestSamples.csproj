@@ -15,5 +15,10 @@
     <PackageReference Include="AWSXRayRecorder.Handlers.AwsSdk" Version="2.8.3" />
     <PackageReference Include="AWSXRayRecorder.Handlers.System.Net" Version="2.7.3" />
   </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ServerlessTestSamples.Core\ServerlessTestSamples.Core.csproj" />
+    <ProjectReference Include="..\ServerlessTestSamples.Integrations\ServerlessTestSamples.Integrations.csproj" />
+  </ItemGroup>
 </Project>
 

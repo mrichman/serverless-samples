@@ -28,6 +28,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\ServerlessTestSamples\ServerlessTestSamples.csproj" />
+    <ProjectReference Include="..\..\src\ServerlessTestSamples.Core\ServerlessTestSamples.Core.csproj" />
   </ItemGroup>
 
 </Project>

@@ -13,11 +13,11 @@ using Moq;
 
 namespace ServerlessTestSamples.UnitTest;
 
-public class MockTest
+public class MockSdkTests
 {
     private bool _runningLocally = string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("LOCAL_RUN")) ? true : bool.Parse(System.Environment.GetEnvironmentVariable("LOCAL_RUN"));
 
-    public MockTest()
+    public MockSdkTests()
     {
         // Required for the XRay tracing sub-segment code in the Lambda function handler.
         AWSXRayRecorder.InitializeInstance();    
