@@ -10,13 +10,16 @@ using Amazon.S3.Model;
 using Amazon.XRay.Recorder.Core;
 using FluentAssertions;
 using Moq;
-using ServerlessTestSamples.Core;
+using ServerlessTestSamples.Core.Queries;
 using ServerlessTestSamples.Core.Services;
+using Microsoft.Extensions.Logging;
 
 namespace ServerlessTestSamples.UnitTest;
 
 public class MockBusinessLogicTests
 {
+    private Mock<ILogger<ListStorageAreasQueryHandler>> _mockLogger = new Mock<ILogger<ListStorageAreasQueryHandler>>();
+
     public MockBusinessLogicTests()
     {
     }
@@ -33,7 +36,7 @@ public class MockBusinessLogicTests
             "bucket3"
         });
         
-        var queryHandler = new ListStorageAreasQueryHandler(mockStorageService.Object);
+        var queryHandler = new ListStorageAreasQueryHandler(mockStorageService.Object, _mockLogger.Object);
 
         var queryResult = await queryHandler.Handle(new ListStorageAreasQuery()
         {
@@ -51,7 +54,7 @@ public class MockBusinessLogicTests
         
         mockStorageService.Setup(p => p.ListStorageAreas(It.IsAny<string>())).ReturnsAsync(() => null);
         
-        var queryHandler = new ListStorageAreasQueryHandler(mockStorageService.Object);
+        var queryHandler = new ListStorageAreasQueryHandler(mockStorageService.Object, _mockLogger.Object);
 
         var queryResult = await queryHandler.Handle(new ListStorageAreasQuery()
         {
@@ -68,7 +71,7 @@ public class MockBusinessLogicTests
         
         mockStorageService.Setup(p => p.ListStorageAreas(It.IsAny<string>())).ThrowsAsync(new Exception());
         
-        var queryHandler = new ListStorageAreasQueryHandler(mockStorageService.Object);
+        var queryHandler = new ListStorageAreasQueryHandler(mockStorageService.Object, _mockLogger.Object);
 
         var queryResult = await queryHandler.Handle(new ListStorageAreasQuery()
         {

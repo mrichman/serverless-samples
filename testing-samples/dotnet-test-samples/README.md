@@ -6,18 +6,18 @@
 This project contains automated test sample code samples for serverless applications. The project uses the [AWS Serverless Application Model](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/what-is-sam.html) (SAM) CLI for configuration, testing and deployment. 
 
 - [Project contents](#project-contents)
-- [Prerequesites](#prerequesites)
+- [Prerequisites](#prerequisites)
 - [Build and deploy with the SAM CLI](#build-and-deploy-with-the-sam-cli)
 - [Working with events](#working-with-events)
-- [Working with local emulators](#working-with-local-emulators)
-  - [Use the SAM Lambda emulator](#use-the-sam-lambda-emulator)
-  - [Use the SAM API Gateway emulator](#use-the-sam-api-gateway-emulator)
 - [Run a unit test using a mock framework](#run-a-unit-test-using-a-mock-framework)
 - [Run an integration test against cloud resources](#run-integration-tests-against-cloud-resources)
 - [Invoke a Lambda function in the cloud](#invoke-a-lambda-function-in-the-cloud)
 - [Fetch, tail, and filter Lambda function logs locally](#fetch-tail-and-filter-lambda-function-logs-locally)
 - [Use SAM Accerate to speed up feedback cycles](#use-sam-accerate-to-speed-up-feedback-cycles)
 - [Use CDK Watch to speed up feedback cycles](#use-cdk-watch-to-speed-up-feedback-cycles)
+- [Working with local emulators](#working-with-local-emulators)
+  - [Use the SAM Lambda emulator](#use-the-sam-lambda-emulator)
+  - [Use the SAM API Gateway emulator](#use-the-sam-api-gateway-emulator)
 - [Perform a load test](#perform-a-load-test)
 - [Implement application tracing](#implement-application-tracing)
 - [Cleanup](#cleanup)
@@ -31,7 +31,7 @@ This application creates several AWS resources, including a Lambda function and 
 - tests - Unit and integration tests for the application code. 
 - template.yaml - A template that defines the application's AWS resources.
 
-## Prerequesites
+## Prerequisites
 The SAM CLI is an extension of the AWS CLI that adds functionality for building and testing serverless applications. It contains features for building your application locally, deploying it to AWS, and emulating AWS services locally to support automated unit tests.  
 
 To use the SAM CLI, you need the following tools.
@@ -68,7 +68,7 @@ After running this command you will receive a series of prompts:
 * **Save arguments to samconfig.toml**: If set to yes, your choices will be saved to a configuration file inside the project, so that in the future you can just re-run `sam deploy` without parameters to deploy changes to your application.
 
 You can find your API Gateway Endpoint URL in the output values displayed after deployment. Take note of this URL for use in the logging section below. On subsequent deploys you can run `sam deploy` without the `--guided` flag. [Read the documentation](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-deploying.html).
-[[top]](#python-test-samples)
+[top](#dotnet-test-samples)
 
 ## Working with events
 Testing event driven architectures often requires working with synthetic events. Events are frequently defined as JSON documents. Synthetic events are test data that represent AWS events such as a requests from API Gateway or a messages from SQS. 
@@ -82,57 +82,234 @@ dotnet-test-samples$ sam local generate-event
 ```
 [[top]](#dotnet-test-samples)
 
-## Working with local emulators
-Local emulation of AWS services offers a simple way to build and test cloud native applications using local resources. Local emulation can speed up the build and deploy cycle creating faster feedback loops for application developers. 
+## Project Structure
 
-Local emulation has several limitations. Cloud services evolve rapidly, so local emulators are unlikely to have feature parity with their counterpart services in the cloud. Local emulators may not be able to provide an accurate representation of IAM permissions or service quotas. Local emulators do not exist for every AWS service.
+The project splits out the Lambda function, core business logic and integrations into seperate libraries. This allows for a clear seperation of concerns between parts of the application and keeps it maintainable, portable and testable.
 
-SAM provides local emulation features for [AWS Lambda](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-using-invoke.html) and [Amazon API Gateway](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-using-start-api.html). AWS provides [Amazon DynamoDB Local](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.html) as well as [AWS Step Functions Local](https://docs.aws.amazon.com/step-functions/latest/dg/sfn-local.html). Third party vendors like [LocalStack](https://docs.localstack.cloud/overview/) may provide emulation for additional AWS services. 
+### ServerlessTestSamples.Core
 
-This project demonstrates local emulation of Lambda and API Gateway with SAM.
+This library contains the business logic with *no external dependencies*. All integrations are abstracted away behind clearly defined interfaces. For example, the interaction with the storage layer uses an IStorageService interface:
 
-[[top]](#dotnet-test-samples)
+```c#
+namespace ServerlessTestSamples.Core.Services;
 
-## Use the SAM Lambda emulator 
-The SAM CLI can emulate a Lambda function inside a Docker container deployed to your local desktop. To use this feature, invoke the function with the `sam local invoke` command passing a synthetic event. Print statements log to standard out. [Read the documentation](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-using-invoke.html).
-
-**TODO: Add detail Lambda emulator**
-
-[[top]](#dotnet-test-samples)
-
-## Use the SAM API Gateway emulator
-**TODO: Add detail about SAM API Gateway emulator**
-
-The SAM CLI reads the application template to determine the API's routes and the functions that they invoke. The `Events` property on each function's definition includes the route and method for each path.
-
-```yaml
-      Events:
-        HelloWorld:
-          Type: Api
-          Properties:
-            Path: /hello
-            Method: get
+public interface IStorageService
+{
+    Task<IEnumerable<string>> ListStorageAreas(string filterPrefix);
+}
 ```
-[[top]](#python-test-samples)
+
+The business logic to query the available storage areas has no external dependencies and can be tested completely independently.
+
+```c#
+public class ListStorageAreasQueryHandler
+{
+    private readonly IStorageService _storageService;
+
+    public ListStorageAreasQueryHandler(IStorageService storageService)
+    {
+        _storageService = storageService;
+    }
+
+    public async Task<ListStorageAreasQueryResult> Handle(ListStorageAreasQuery query)
+    {
+        try
+        {
+            var storageAreas = await _storageService.ListStorageAreas(query.FilterPrefix);
+
+            if (storageAreas == null)
+            {
+                storageAreas = new List<string>(0);
+            }
+
+            return new ListStorageAreasQueryResult
+            {
+                StorageAreas = storageAreas
+            };
+        }
+        catch (Exception ex)
+        {
+            // Add logging/metrics here.
+            return new ListStorageAreasQueryResult
+            {
+                StorageAreas = new List<string>(0),
+            };
+        }
+    }
+
+```
+
+### ServerlessTestSamples.Integrations
+
+This project contains all code that handles integrations your application has. This includes databases, caches, 3rd party API's. All implementation logic is stored in this one library.
+
+In this case, the implementation of our storage service to interact with Amazon S3 is included here
+
+```c#
+public class StorageService : IStorageService
+{
+    private readonly AmazonS3Client _s3Client;
+
+    public StorageService(AmazonS3Client client)
+    {
+        this._s3Client = client ?? new AmazonS3Client();
+    }
+
+    public async Task<IEnumerable<string>> ListStorageAreas(string filterPrefix)
+    {
+        var buckets = await this._s3Client.ListBucketsAsync();
+
+        if (buckets.HttpStatusCode != HttpStatusCode.OK)
+        {
+            return new List<string>(0);
+        }
+    }
+}    
+```
+
+### Lambda Functions
+
+Outside of these two shared libraries, there is then a separate project per Lambda function. This provides a clear separation of concerns and ensures the functions have a single purpose.
+
+The way we initialize our Lambda function is important for testing. The Lambda service always requires a parameterless constructor for initialization. However, all our function initialization logic is included in an internal constructor. This allows mock implementations to be used for testing.    
+
+```c#
+public class Function
+{
+    private static ListStorageAreasQueryHandler _queryHandler;
+    private static HttpClient _httpClient;
+
+    public Function() : this(null, null)
+    {
+    }
+
+    internal Function(AmazonS3Client client, HttpClient httpClient)
+    {
+        AWSSDKHandler.RegisterXRayForAllServices();
+
+        this._queryHandler = new ListStorageAreasQueryHandler(new StorageService(client ?? new AmazonS3Client()));
+        this._httpClient = httpClient ?? new HttpClient(new HttpClientXRayTracingHandler(new HttpClientHandler()));
+    }
+    ...
+}
+```
+
+The [InternalsVisibleToAttribute](https://docs.microsoft.com/en-us/dotnet/api/system.runtime.compilerservices.internalsvisibletoattribute?view=net-6.0) then allows us to expose this internal constructor to out unit tests.
+
+```c#
+[assembly:InternalsVisibleTo("ServerlessTestSamples.UnitTest")]
+```
+
+[[top]](#dotnet-test-samples)
 
 ## Run a unit test using a mock framework
 Lambda functions frequently call other AWS or 3rd party services. Mock frameworks are useful to simulate service responses. Mock frameworks can speed the development process by enabling rapid feedback iterations. Mocks can be particularly useful for testing failure cases when testing these branches of logic are difficult to do in the cloud.
 
-The project uses mocks to test the internal logic of a Lambda function.
-The project uses the [Moq](https://github.com/moq/moq4) library to provide a mock implementation of the AmazonS3Client. This allows test cases to be easily configured to test the different possible responses from Amazon S3.
+This project demonstrates how to run tests on both our core business logic, and also for unit testing our Lambda function code itself.
+
+The project uses [xUnit](https://xunit.net/) as the test framework and [Moq](https://github.com/moq/moq4) to provide mocking.
+
+### Testing Business Logic
+
+Business logic tests can be found in the [MockBusinessLogicTests.cs](./tests/ServerlessTestSamples.UnitTest/MockBusinessLogicTests.cs) file.
+
+```c#
+[Fact]
+public async Task TestCoreBusinessLogicWithSuccessfulResponse_ShouldReturnStorageAreas()
+{
+    var mockStorageService = new Mock<IStorageService>();
+    
+    mockStorageService.Setup(p => p.ListStorageAreas(It.IsAny<string>())).ReturnsAsync(new List<string>()
+    {
+        "bucket1",
+        "bucket2",
+        "bucket3"
+    });
+    
+    var queryHandler = new ListStorageAreasQueryHandler(mockStorageService.Object);
+
+    var queryResult = await queryHandler.Handle(new ListStorageAreasQuery()
+    {
+        FilterPrefix = string.Empty
+    });
+
+    queryResult.StorageAreas.Count().Should().Be(3);
+    queryResult.StorageAreas.FirstOrDefault().Should().Be("bucket1");
+}
+```
+
+Using Moq, it is possible to create a Mock implementation of any object. Once mocked, it is possible to setup how different methods will be invoked.
+
+In this example, a mock implementation of the ListStorageAreas is added that will be invoked. The It.IsAny<string>() line determines which parameters will cause this mock to be invoked. In this case, if any string is passed into the method this mock will be invoked. The ReturnsAsync method then allows us to define what will be be returned by the mock. In this instance, we are returning a hardcoded list of strings.
+
+When the ListStorageAreasQueryHandler is initialised the instance of our mock storage service is passed in.
+
+### Mocking integrations
+
+Another strategy for mocking is to mock the integrations with 3rd parties. An example of this would be to move the AWS SDK calls. An example of this can be seen in [MockSdkTests.cs](./tests/ServerlessTestSamples.UnitTest/MockSdkTests.cs).
+
+In the below code sample we are testing our function logic and that the ApiGateway response is what is expected. A mock implementation of the AmazonS3Client is created and the ListBucketsAsync method is mocked.
+
+This is a useful approach, but can be brittle as the AWS API's change regularly. There is no guarantee that your mocked response will match how response from the actual API call. This is a great reason to test in the cloud as quickly as possible.
+
+```c#
+[Fact]
+public async Task TestLambdaHandlerWithValidS3Response_ShouldReturnSuccess()
+{
+    var mockedS3Client = new Mock<AmazonS3Client>();
+    var mockHttpClient = new Mock<HttpClient>();
+    
+    mockedS3Client.Setup(p => p.ListBucketsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new ListBucketsResponse()
+    {
+        Buckets = new List<S3Bucket>()
+        {
+            new S3Bucket(){BucketName = "bucket1"},
+            new S3Bucket(){BucketName = "bucket2"},
+            new S3Bucket(){BucketName = "bucket3"},
+        },
+        HttpStatusCode = HttpStatusCode.OK
+    });
+    
+    var mockRequest = new Mock<APIGatewayProxyRequest>();
+
+    var function = new Function(mockedS3Client.Object, mockHttpClient.Object);
+
+    var result = await function.Handler(mockRequest.Object, new TestLambdaContext());
+
+    result.StatusCode.Should().Be(200);
+    result.Body.Should().Be("[\"bucket1\",\"bucket2\",\"bucket3\"]");
+}
+```
+
+Another useful feature of Moq is the ability to test exceptions. In the below example, instead of mocking the response of the method call an Exception is thrown. This allows a test to be written to understand what would happen if the S3 SDK threw an exception.  
+
+```c#
+[Fact]
+public async Task TestLambdaHandlerWithS3Exception_ShouldReturnEmpty()
+{
+    var mockedS3Client = new Mock<AmazonS3Client>();
+    var mockHttpClient = new Mock<HttpClient>();
+    
+    mockedS3Client.Setup(p => p.ListBucketsAsync(It.IsAny<CancellationToken>()))
+        .ThrowsAsync(new AmazonS3Exception("Mock S3 failure"));
+    
+    var mockRequest = new Mock<APIGatewayProxyRequest>();
+
+    var function = new Function(mockedS3Client.Object, mockHttpClient.Object);
+
+    var result = await function.Handler(mockRequest.Object, new TestLambdaContext());
+
+    result.StatusCode.Should().Be(500);
+    result.Body.Should().Be("[]");
+}
+```
+
+To execute the tests, run the below commands from a terminal.
 
 ```bash
 
 # run unit tests with mocks
 dotnet-test-samples$ dotnet test .\tests\ServerlessTestSamples.UnitTest\
-```
-
-The constructor of the Lambda function class contains one public, functionless constructor and one internal constructor. The Lambda service requires a parameterless constructor. The internal constructor is included to allow mock implementations of services to be passed in at initialization. The internal constructor is made available to the ServerlessTestSamples.UnitTest project through the AssemblyInfo.cs file.
-
-```c#
-using System.Runtime.CompilerServices;
-
-[assembly:InternalsVisibleTo("ServerlessTestSamples.UnitTest")]
 ```
 
 [[top]](#dotnet-test-samples)
@@ -144,9 +321,50 @@ Integration tests run against deployed cloud resources. Since local unit tests c
 # Set the environment variable AWS_SAM_STACK_NAME to the name of the stack you specified during deploy
 dotnet-test-samples$ AWS_SAM_STACK_NAME=<stack-name> dotnet test .\tests\ServerlessTestSamples.IntegrationTest\
 ```
+
+The sample integration test is straigtforward. The [Setup.cs](./tests/ServerlessTestSamples.IntegrationTest/Setup.cs) is performed using the [class fixture feature of xUnit.](https://xunit.net/docs/shared-context) Class fixtures allow code to be executed once and then shared between all unit tests. In this example, we use the class fixture to retrive the API url and store that in a static variable. This class fixture could be used to create any hardcoded resources to use for testing. The Setup class also implements IDisposable, meaning any test cleanup can be executed in the Dispose() method.
+
+```c#
+public Setup()
+{
+    var stackName = System.Environment.GetEnvironmentVariable("AWS_SAM_STACK_NAME") ?? "dotnet-test-samples";
+    var region = System.Environment.GetEnvironmentVariable("AWS_SAM_REGION_NAME") ?? "us-east-1";
+
+    if (string.IsNullOrEmpty(stackName))
+    {
+        throw new Exception("Cannot find env var AWS_SAM_STACK_NAME. Please setup this environment variable with the stack name where we are running integration tests.");
+    }
+
+    var cloudFormationClient = new AmazonCloudFormationClient(new AmazonCloudFormationConfig()
+    {
+        RegionEndpoint = RegionEndpoint.USEast1
+    });
+
+    var response = cloudFormationClient.DescribeStacksAsync(new DescribeStacksRequest()
+    {
+        StackName = stackName
+    }).Result;
+
+    var output = response.Stacks[0].Outputs.FirstOrDefault(p => p.OutputKey == "HelloWorldApi");
+
+    Setup.ApiUrl = output.OutputValue;
+}
+```
+
+Once the API Url has been set, we can then use that in an integration test to ensure the code works as expected.
+
+```c#
+[Fact]
+public async Task TestApiGateway_ShouldReturnSuccess()
+{
+    var result = await this._httpClient.GetAsync(Setup.ApiUrl);
+    result.IsSuccessStatusCode.Should().BeTrue();
+}
+```
+
 [[top]](#dotnet-test-samples)
 
-## Invoke a Lambda function in the cloud
+## Directly invoke a Lambda function in the cloud
 The `AWS CLI` enables you to invoke a Lambda function in the cloud.
 
 ```bash
@@ -182,11 +400,38 @@ AWS SAM Accelerate is a set of features that reduces deployment latency and enab
 # synchronize local code with the cloud
 dotnet-test-samples$ sam sync --watch --stack-name dotnet-test-samples
 ```
+
+[[top]](#dotnet-test-samples)
+## Working with local emulators
+Local emulation of AWS services offers a simple way to build and test cloud native applications using local resources. Local emulation can speed up the build and deploy cycle creating faster feedback loops for application developers.
+
+Local emulation has several limitations. Cloud services evolve rapidly, so local emulators are unlikely to have feature parity with their counterpart services in the cloud. Local emulators may not be able to provide an accurate representation of IAM permissions or service quotas. Local emulators do not exist for every AWS service.
+
+SAM provides local emulation features for [AWS Lambda](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-using-invoke.html) and [Amazon API Gateway](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-using-start-api.html). AWS provides [Amazon DynamoDB Local](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.html) as well as [AWS Step Functions Local](https://docs.aws.amazon.com/step-functions/latest/dg/sfn-local.html). Third party vendors like [LocalStack](https://docs.localstack.cloud/overview/) may provide emulation for additional AWS services.
+
+This project demonstrates local emulation of Lambda and API Gateway with SAM.
+
 [[top]](#dotnet-test-samples)
 
-## Use CDK Watch to speed up feedback cycles
+## Use the SAM Lambda emulator
+The SAM CLI can emulate a Lambda function inside a Docker container deployed to your local desktop. To use this feature, invoke the function with the `sam local invoke` command passing a synthetic event. Print statements log to standard out. [Read the documentation](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-using-invoke.html).
 
-[[top]](#python-test-samples)
+[[top]](#dotnet-test-samples)
+
+## Use the SAM API Gateway emulator
+
+The SAM CLI reads the application template to determine the API's routes and the functions that they invoke. The `Events` property on each function's definition includes the route and method for each path.
+
+```yaml
+      Events:
+        HelloWorld:
+          Type: Api
+          Properties:
+            Path: /hello
+            Method: get
+```
+[[top]](#dotnet-test-samples)
+
 
 ## Perform a load test
 Load tests should be executed in the cloud prior to any initial deployment to production environments. Load tests can be useful to discover performance bottlenecks and quota limits. Load tests should be scripted and repeatable. Load tests should simulate your application's expected peak load. 
@@ -205,7 +450,7 @@ cd loadtest
 ./run-load-test.ps1
 ```
 
-[[top]](#python-test-samples)
+[[top]](#dotnet-test-samples)
 
 ## Implement application tracing
 You can use AWS X-Ray to track user requests as they travel through your entire application. With X-Ray, you can understand how your application and its underlying services are performing to identify and troubleshoot the root cause of performance issues and errors.
@@ -220,23 +465,23 @@ To enable this for AWS Lambda the SAM template and function code both need to be
 
 ### SAM Template
 
-Tracing needs to be enabled in the SAM template for both the API and Lambda function. Enable this with two additional properties in the Globals section of the SAM template.
+Tracing needs to be enabled in the SAM template for both the API and Lambda function. Enable this with the two additional tracing properties in the Globals section of the SAM template.
 
 ``` yaml
 Globals:
   Function:
-    Tracing: PassThrough
+#    Tracing: PassThrough
     Timeout: 10
     Runtime: dotnet6
     Architectures:
       - arm64
-  Api:
-    TracingEnabled: True
+#  Api:
+#    TracingEnabled: True
 ```
 
 ### Function Code
 
-Code is instrumented in the function code. For auto-instrumentation of the AWSSDK the AWSSDK handler needs to be registered before the SDK clients are initialised.
+Instrumentation then needs to be added in the Function code. In this example tracing is enabled for all AWS SDK calls. There are [various auto-instrumentation libraries available including HTTP and SQL.](https://docs.aws.amazon.com/xray/latest/devguide/xray-sdk-dotnet.html)
 
 ```c#
 internal Function(AmazonS3Client client, HttpClient httpClient)
@@ -250,7 +495,7 @@ internal Function(AmazonS3Client client, HttpClient httpClient)
 
 Further details on instrumenting with the [AWS XRay Recorder library are found in the AWS Docs.](https://docs.aws.amazon.com/xray/latest/devguide/xray-sdk-dotnet-segment.html) 
 
-[[top]](#python-test-samples)
+[[top]](#dotnet-test-samples)
 
 ## Cleanup
 

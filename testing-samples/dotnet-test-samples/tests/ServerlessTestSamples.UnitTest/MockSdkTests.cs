@@ -10,12 +10,18 @@ using Amazon.S3.Model;
 using Amazon.XRay.Recorder.Core;
 using FluentAssertions;
 using Moq;
+using Microsoft.Extensions.Logging;
+using ServerlessTestSamples.Core.Queries;
+using ServerlessTestSamples.Core.Services;
+using ServerlessTestSamples.Integrations;
 
 namespace ServerlessTestSamples.UnitTest;
 
 public class MockSdkTests
 {
     private bool _runningLocally = string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("LOCAL_RUN")) ? true : bool.Parse(System.Environment.GetEnvironmentVariable("LOCAL_RUN"));
+    private Mock<ILogger<Function>> _mockLogger = new Mock<ILogger<Function>>();
+    private Mock<ILogger<ListStorageAreasQueryHandler>> _mockHandlerLogger = new Mock<ILogger<ListStorageAreasQueryHandler>>();
 
     public MockSdkTests()
     {
@@ -42,13 +48,15 @@ public class MockSdkTests
         });
         
         var mockRequest = new Mock<APIGatewayProxyRequest>();
+        var storageService = new StorageService(mockedS3Client.Object);
+        var handler = new ListStorageAreasQueryHandler(storageService, _mockHandlerLogger.Object);
 
-        var function = new Function(mockedS3Client.Object, mockHttpClient.Object);
+        var function = new Function(handler, _mockLogger.Object);
 
         var result = await function.Handler(mockRequest.Object, new TestLambdaContext());
 
         result.StatusCode.Should().Be(200);
-        result.Body.Should().Be("[\"bucket1\",\"bucket2\",\"bucket3\"]");
+        result.Body.Should().Be("{\"StorageAreas\":[\"bucket1\",\"bucket2\",\"bucket3\"]}");
     }
 
     [Fact]
@@ -65,13 +73,15 @@ public class MockSdkTests
         });
         
         var mockRequest = new Mock<APIGatewayProxyRequest>();
+        var storageService = new StorageService(mockedS3Client.Object);
+        var handler = new ListStorageAreasQueryHandler(storageService, _mockHandlerLogger.Object);
 
-        var function = new Function(mockedS3Client.Object, mockHttpClient.Object);
+        var function = new Function(handler, _mockLogger.Object);
 
         var result = await function.Handler(mockRequest.Object, new TestLambdaContext());
 
         result.StatusCode.Should().Be(200);
-        result.Body.Should().Be("[]");
+        result.Body.Should().Be("{\"StorageAreas\":[]}");
     }
 
     [Fact]
@@ -87,13 +97,15 @@ public class MockSdkTests
         });
         
         var mockRequest = new Mock<APIGatewayProxyRequest>();
+        var storageService = new StorageService(mockedS3Client.Object);
+        var handler = new ListStorageAreasQueryHandler(storageService, _mockHandlerLogger.Object);
 
-        var function = new Function(mockedS3Client.Object, mockHttpClient.Object);
+        var function = new Function(handler, _mockLogger.Object);
 
         var result = await function.Handler(mockRequest.Object, new TestLambdaContext());
 
-        result.StatusCode.Should().Be(500);
-        result.Body.Should().Be("[]");
+        result.StatusCode.Should().Be(200);
+        result.Body.Should().Be("{\"StorageAreas\":[]}");
     }
 
     [Fact]
@@ -106,12 +118,14 @@ public class MockSdkTests
             .ThrowsAsync(new AmazonS3Exception("Mock S3 failure"));
         
         var mockRequest = new Mock<APIGatewayProxyRequest>();
+        var storageService = new StorageService(mockedS3Client.Object);
+        var handler = new ListStorageAreasQueryHandler(storageService, _mockHandlerLogger.Object);
 
-        var function = new Function(mockedS3Client.Object, mockHttpClient.Object);
+        var function = new Function(handler, _mockLogger.Object);
 
         var result = await function.Handler(mockRequest.Object, new TestLambdaContext());
 
-        result.StatusCode.Should().Be(500);
-        result.Body.Should().Be("[]");
+        result.StatusCode.Should().Be(200);
+        result.Body.Should().Be("{\"StorageAreas\":[]}");
     }
 }

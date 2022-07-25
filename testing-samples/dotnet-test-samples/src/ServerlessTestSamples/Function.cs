@@ -11,8 +11,10 @@ using System.Net;
 using Amazon.XRay.Recorder.Core;
 using Amazon.XRay.Recorder.Handlers.AwsSdk;
 using Amazon.XRay.Recorder.Handlers.System.Net;
-using ServerlessTestSamples.Core;
+using ServerlessTestSamples.Core.Queries;
 using ServerlessTestSamples.Integrations;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 // Assembly attribute to enable the Lambda function's JSON input to be converted into a .NET class.
 [assembly: LambdaSerializer(typeof(Amazon.Lambda.Serialization.SystemTextJson.DefaultLambdaJsonSerializer))]
@@ -21,19 +23,20 @@ namespace ServerlessTestSamples
 {
     public class Function
     {
-        private readonly ListStorageAreasQueryHandler _queryHandler;
-        private readonly HttpClient _httpClient;
+        private static ListStorageAreasQueryHandler _queryHandler;
+        private static ILogger<Function> _logger;
 
         public Function() : this(null, null)
         {
         }
 
-        internal Function(AmazonS3Client client, HttpClient httpClient)
+        internal Function(ListStorageAreasQueryHandler handler, ILogger<Function> logger)
         {
             AWSSDKHandler.RegisterXRayForAllServices();
+            Startup.InitializeServiceProvider();
 
-            this._queryHandler = new ListStorageAreasQueryHandler(new StorageService(client ?? new AmazonS3Client()));
-            this._httpClient = httpClient ?? new HttpClient(new HttpClientXRayTracingHandler(new HttpClientHandler()));
+            _queryHandler = handler ?? Startup.ServiceProvider.GetRequiredService<ListStorageAreasQueryHandler>();
+            _logger = logger ?? Startup.ServiceProvider.GetRequiredService<ILogger<Function>>();
         }
 
         public async Task<APIGatewayProxyResponse> Handler(APIGatewayProxyRequest apigProxyEvent,
@@ -41,12 +44,7 @@ namespace ServerlessTestSamples
         {
             try
             {
-                var queryResult = await this._queryHandler.Handle(new ListStorageAreasQuery());
-
-                // Demonstrate tracing of an external HTTP request.
-                await this._httpClient.GetAsync("https://google.com");
-
-                Console.WriteLine("Write to logs");
+                var queryResult = await _queryHandler.Handle(new ListStorageAreasQuery());
 
                 return new APIGatewayProxyResponse
                 {

@@ -1,6 +1,7 @@
 using ServerlessTestSamples.Core.Services;
+using Microsoft.Extensions.Logging;
 
-namespace ServerlessTestSamples.Core;
+namespace ServerlessTestSamples.Core.Queries;
 
 public class ListStorageAreasQuery
 {
@@ -15,10 +16,13 @@ public class ListStorageAreasQueryResult
 public class ListStorageAreasQueryHandler
 {
     private readonly IStorageService _storageService;
+    private readonly ILogger<ListStorageAreasQueryHandler> _logger;
+    
 
-    public ListStorageAreasQueryHandler(IStorageService storageService)
+    public ListStorageAreasQueryHandler(IStorageService storageService, ILogger<ListStorageAreasQueryHandler> logger)
     {
         _storageService = storageService;
+        _logger = logger;
     }
 
     public async Task<ListStorageAreasQueryResult> Handle(ListStorageAreasQuery query)
