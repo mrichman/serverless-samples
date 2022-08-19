@@ -1,0 +1,45 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Unit testing Go Lambda function
+
+Globals:
+  Function:
+    Timeout: 5
+    Tracing: Active
+  Api:
+    TracingEnabled: True
+
+Resources:
+  HelloWorldFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: hello-world/
+      Handler: hello-world
+      Runtime: go1.x
+      Architectures:
+        - x86_64
+      Events:
+        CatchAll:
+          Type: Api
+          Properties:
+            Path: /hello
+            Method: POST
+      Environment:
+        Variables:
+          DYNAMODB_TABLE: !Ref MyTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MyTable
+
+  MyTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      TableName: MyTable
+
+Outputs:
+  HelloWorldAPI:
+    Description: "API Gateway endpoint URL for Prod environment for First Function"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello/"
+  Table:
+    Description: "DynamoDB table name"
+    Value: !Ref MyTable
